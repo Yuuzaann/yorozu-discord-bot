@@ -1,0 +1,21 @@
+{
+  "name": "yorozu",
+  "version": "1.0.0",
+  "description": "Yorozu — all-in-one Discord community management bot (setup, verification, roles, tickets, voice, welcome cards)",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "deploy": "node src/deploy-commands.js"
+  },
+  "engines": {
+    "node": ">=18.17.0"
+  },
+  "dependencies": {
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.5",
+    "@napi-rs/canvas": "^0.1.44"
+  },
+  "license": "MIT"
+}
