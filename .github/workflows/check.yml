@@ -1,0 +1,41 @@
+name: Syntax Check
+
+# Runs on every push and pull request against main — catches typos/syntax
+# errors on GitHub before they ever reach the Pterodactyl deployment.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    name: Check syntax & install
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Syntax-check every source file
+        run: |
+          status=0
+          while IFS= read -r -d '' file; do
+            if ! node --check "$file"; then
+              echo "::error file=$file::Syntax error in $file"
+              status=1
+            fi
+          done < <(find src -name "*.js" -print0)
+          exit $status
+
+      - name: Validate package.json
+        run: node -e "JSON.parse(require('fs').readFileSync('package.json', 'utf-8')); console.log('package.json is valid JSON')"
