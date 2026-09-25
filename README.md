@@ -110,6 +110,9 @@ Every join and leave gets a generated banner image — avatar, member count, ser
 ### 🤖 A status that's actually yours
 `/status set` lets you put anything you want as the bot's Discord activity — *Playing*, *Watching*, *Listening*, *Competing*, or a plain *Custom* status — paired with any online/idle/dnd/invisible state. It's deliberately restricted to the bot's **application owner** rather than any server's admin, because a bot only has one presence shared across every server it's in; letting every admin change it would mean servers fighting over the same status line.
 
+### 📊 Live server stats
+A dedicated category shows real-time counts as join-locked voice channel names — 👤 All Members, ✨ Members, 🤖 Bots, 📁 Channels — visible to everyone, nobody able to actually connect to them. They're populated immediately after `/setup server`, refreshed automatically every **10 minutes** (matching Discord's hard limit of 2 name-edits per 10 minutes per channel — not an arbitrary number), and can be force-refreshed any time with `/stats refresh`.
+
 ### 🌍 Bilingual by default
 Every embed, every button, every error message the bot sends is written in **both Indonesian and English**, side by side. Not a locale switch you have to configure — it's simply how the bot talks, everywhere, all the time.
 
@@ -118,6 +121,12 @@ Every embed, every button, every error message the bot sends is written in **bot
 ## 🌳 The Server Structure It Builds
 
 ```
+📊 Server Stats                 (visible to everyone, join-locked — live member/bot/channel counts)
+├── 👤 All Members: 0
+├── ✨ Members: 0
+├── 🤖 Bots: 0
+└── 📁 Channels: 0
+
 🌐 Important                    (read-only, but welcome/rules/take-role/verification stay open pre-verification)
 ├── 👋 welcome
 ├── ☑️ rules                    ← bilingual rules auto-posted here
@@ -227,6 +236,7 @@ npm run dev
 | `/config view` | Administrator | View the current guild configuration as JSON |
 | `/config set <key> <value>` | Administrator | Change any configuration value live |
 | `/config staff-role` | Administrator | Set which role counts as ticket staff |
+| `/stats refresh` | Administrator | Force-refresh the Server Stats channels immediately |
 | `/status set` / `/status clear` | **Bot owner only** | Set or clear the bot's Discord presence, globally |
 | `/help` | Anyone | Show this command list in Discord |
 
@@ -285,9 +295,10 @@ src/
 │   ├── voice.js           /voice name/limit/lock/unlock/claim/kick/info
 │   ├── config.js          /config view/set/staff-role
 │   ├── status.js          /status set/clear
+│   ├── stats.js           /stats refresh
 │   └── help.js            /help
 ├── events/                discord.js Gateway event handlers
-│   ├── ready.js           Applies stored bot status on boot
+│   ├── ready.js           Applies stored bot status + first stats refresh on boot
 │   ├── guildCreate.js     Greets a server the bot just joined
 │   ├── guildMemberAdd.js / guildMemberRemove.js   Welcome/goodbye cards
 │   ├── voiceStateUpdate.js  Temp voice creation & cleanup
@@ -299,6 +310,7 @@ src/
 │   ├── ticketService.js   Ticket panel, lifecycle, transcripts
 │   ├── temporaryVoiceService.js  Room creation, ownership, auto-cleanup
 │   ├── welcomeService.js  Canvas-rendered welcome/goodbye cards
+│   ├── statsService.js    Computes & applies live Server Stats channel names
 │   ├── configService.js   Per-guild + global config persistence
 │   └── loggingService.js  Writes audit events to the guild's log channel
 ├── config/                Static, declarative configuration

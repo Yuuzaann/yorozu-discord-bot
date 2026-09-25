@@ -68,6 +68,12 @@ export const defaultConfig = {
     // Override with /config set rules.content "your own text" for a custom set of rules.
     content: null,
   },
+  serverStats: {
+    // Toggle with /config set serverStats.enabled false. Update cadence is
+    // fixed at 10 minutes in index.js (matching Discord's channel-rename
+    // rate limit), not configurable per guild — see statsService.js.
+    enabled: true,
+  },
 };
 
 /** Roles that must never be grantable through self-role, ticket or voice systems. */

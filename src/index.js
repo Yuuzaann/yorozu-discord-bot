@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createLogger } from './utils/logger.js';
 import { temporaryVoiceService } from './services/temporaryVoiceService.js';
+import { statsService } from './services/statsService.js';
 
 const logger = createLogger('Bootstrap');
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -67,6 +68,13 @@ async function bootstrap() {
   await loadCommands();
   await loadEvents();
   await client.login(process.env.DISCORD_TOKEN);
+
+  // Refresh Server Stats channel names every 10 minutes — matches Discord's
+  // hard rate limit of 2 channel-name edits per 10 minutes per channel, so
+  // this is the fastest safe cadence, not an arbitrary choice.
+  setInterval(() => {
+    statsService.updateAllGuilds(client).catch((err) => logger.error('Server stats update failed', err.stack ?? err.message));
+  }, 10 * 60 * 1000);
 }
 
 bootstrap().catch((err) => {

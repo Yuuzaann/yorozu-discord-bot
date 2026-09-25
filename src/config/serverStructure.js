@@ -12,8 +12,22 @@ import { ChannelType } from 'discord.js';
  * for the Verified role specifically at the channel level (used for the
  * verification channel: open before verifying, gone afterwards — Staff/
  * Admin keep access since that's a separate role/permission entirely).
+ * `statsCategory` marks the Server Stats category: visible to everyone
+ * (verified or not) but nobody can actually join those voice channels —
+ * their names are periodically rewritten by statsService with live counts.
  */
 export const SERVER_STRUCTURE = [
+  {
+    name: '📊 Server Stats',
+    readonly: false,
+    statsCategory: true,
+    channels: [
+      { name: '👤・All Members: 0', type: ChannelType.GuildVoice, voice: true },
+      { name: '✨・Members: 0', type: ChannelType.GuildVoice, voice: true },
+      { name: '🤖・Bots: 0', type: ChannelType.GuildVoice, voice: true },
+      { name: '📁・Channels: 0', type: ChannelType.GuildVoice, voice: true },
+    ],
+  },
   {
     name: '🌐 Important',
     readonly: true,

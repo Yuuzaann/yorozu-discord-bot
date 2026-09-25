@@ -5,6 +5,7 @@ import { VOICE_GUIDE } from '../config/voiceGuideContent.js';
 import { roleService } from './roleService.js';
 import { verificationService } from './verificationService.js';
 import { ticketService } from './ticketService.js';
+import { statsService } from './statsService.js';
 import { configService } from './configService.js';
 import { loggingService } from './loggingService.js';
 import { createLogger } from '../utils/logger.js';
@@ -243,6 +244,11 @@ class ServerSetupService {
 
       await Promise.all([postRules, postVoiceGuides, ensureGeneralAccess]);
 
+      // 16. Populate the Server Stats channels with real numbers right away
+      // instead of leaving them at their placeholder "0" until the next
+      // 10-minute scheduled update.
+      await statsService.updateGuildStats(guild).catch((err) => report.errors.push(`Failed to populate server stats: ${err.message}`));
+
       report.success = true;
     } catch (err) {
       logger.error('Setup failed', err.message);
@@ -259,6 +265,11 @@ class ServerSetupService {
 
     if (categoryDef.staffOnly) {
       overwrites.push({ id: everyone.id, deny: [PermissionFlagsBits.ViewChannel] });
+      overwrites.push({ id: staff.id, allow: STAFF_ALLOW });
+    } else if (categoryDef.statsCategory) {
+      // Visible to everyone (verified or not) — the whole point is showing
+      // off live counts — but nobody can actually join these voice channels.
+      overwrites.push({ id: everyone.id, allow: [PermissionFlagsBits.ViewChannel], deny: [PermissionFlagsBits.Connect] });
       overwrites.push({ id: staff.id, allow: STAFF_ALLOW });
     } else if (categoryDef.readonly) {
       // Hidden until verified; verified members can view/read but not post
