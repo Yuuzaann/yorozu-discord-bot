@@ -1,6 +1,6 @@
 /**
  * Generic bilingual (Indonesian/English) server rules posted automatically
- * to the 〔☑️〕 RULES channel when /setup server finishes. Editable per-guild
+ * to the 〔☑️〕RULES channel when /setup server finishes. Editable per-guild
  * via /config set rules.content "<your own text>".
  */
 export const DEFAULT_RULES = {

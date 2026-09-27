@@ -15,7 +15,7 @@ function redact(meta) {
 }
 
 /**
- * Sends structured events to the guild's ⚙️ ┊ BOT LOGS > 〔🔗〕 ACTION LOG channel
+ * Sends structured events to the guild's ⚙️ ┊ BOT LOGS > 〔🔗〕ACTION LOG channel
  * (falling back to console if the channel isn't configured yet).
  * Never forwards token/password/secret fields.
  */
@@ -23,7 +23,7 @@ class LoggingService {
   async logAction(guild, title, description, fields = {}) {
     const safeFields = redact(fields);
     try {
-      const channel = guild.channels.cache.find((c) => c.name === '〔🔗〕 ACTION LOG');
+      const channel = guild.channels.cache.find((c) => c.name === '〔🔗〕ACTION LOG');
       if (!channel || !channel.isTextBased()) {
         logger.info(`[${guild.name}] ${title}: ${description}`, safeFields);
         return;
@@ -41,7 +41,7 @@ class LoggingService {
 
   async logInvite(guild, description, fields = {}) {
     try {
-      const channel = guild.channels.cache.find((c) => c.name === '〔🔗〕 INVITE LOG');
+      const channel = guild.channels.cache.find((c) => c.name === '〔🔗〕INVITE LOG');
       if (!channel || !channel.isTextBased()) return;
       const embed = infoEmbed('Invite Event / Event Undangan', description);
       const entries = Object.entries(redact(fields));

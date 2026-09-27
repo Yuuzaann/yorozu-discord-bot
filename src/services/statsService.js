@@ -5,7 +5,7 @@ import { configService } from './configService.js';
 const logger = createLogger('StatsService');
 
 /**
- * Each stat's display is `〔${emoji}〕 ${label}: ${count}` — the part before
+ * Each stat's display is `〔${emoji}〕${label}: ${count}` — the part before
  * the count (the "prefix") is what we match existing channels against, so
  * updates work purely by scanning channel names in the live guild cache.
  * No setup-time state needed, so this works correctly even right after a
@@ -24,7 +24,7 @@ const STAT_TYPES = [
 // leave/channel change in real time.
 class StatsService {
   _prefix(def) {
-    return `〔${def.emoji}〕 ${def.label}:`;
+    return `〔${def.emoji}〕${def.label}:`;
   }
 
   /** Computes current counts. Fetches the full member list once if the cache looks incomplete (needed for an accurate bot/human split). */

@@ -188,7 +188,7 @@ class ServerSetupService {
         })
       );
 
-      // 8b. Point the guild's AFK settings at the 〔💤〕 AFK voice channel
+      // 8b. Point the guild's AFK settings at the 〔💤〕AFK voice channel
       // created above, with a 15-minute timeout (900s — one of Discord's
       // fixed AFK timeout values: 60/300/900/1800/3600).
       if (afkChannel) {

@@ -1,6 +1,6 @@
 /**
  * Guide for the /voice command family, posted automatically to every
- * "〔✨〕 INTERFACE" channel by /setup server. Indonesian and English are
+ * "〔✨〕INTERFACE" channel by /setup server. Indonesian and English are
  * kept as two separate full blocks (matches DEFAULT_RULES in
  * rulesContent.js) rather than interleaved line-by-line, so serverSetup.js
  * can post them as two embed fields: '🇮🇩 Bahasa Indonesia' then '🇬🇧 English'.
@@ -8,7 +8,7 @@
 export const VOICE_GUIDE = {
   title: '🎧 Panduan Voice Room / Voice Room Guide',
   id: [
-    'Masuk ke channel **〔➕〕 JOIN TO CREATE** untuk otomatis membuat room voice pribadi milikmu. Command di bawah hanya berlaku selagi kamu berada di dalam room voice sementara milikmu sendiri.',
+    'Masuk ke channel **〔➕〕JOIN TO CREATE** untuk otomatis membuat room voice pribadi milikmu. Command di bawah hanya berlaku selagi kamu berada di dalam room voice sementara milikmu sendiri.',
     '',
     '**/voice name <nama>** — Ganti nama room kamu.',
     '**/voice limit <0-99>** — Atur batas jumlah member (0 = tanpa batas).',
@@ -21,7 +21,7 @@ export const VOICE_GUIDE = {
     'Room otomatis terhapus begitu kosong.',
   ].join('\n'),
   en: [
-    'Join **〔➕〕 JOIN TO CREATE** to automatically get your own personal voice room. The commands below only work while you are inside your own temporary voice room.',
+    'Join **〔➕〕JOIN TO CREATE** to automatically get your own personal voice room. The commands below only work while you are inside your own temporary voice room.',
     '',
     '**/voice name <name>** — Rename your room.',
     '**/voice limit <0-99>** — Set the member limit (0 = unlimited).',
