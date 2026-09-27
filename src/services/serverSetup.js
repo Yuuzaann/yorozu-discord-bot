@@ -137,6 +137,7 @@ class ServerSetupService {
       const createdChannelsByName = {};
       const specialChannels = {};
       const interfaceChannels = [];
+      let afkChannel = null;
 
       const categoryEntries = await Promise.all(
         SERVER_STRUCTURE.map(async (categoryDef) => {
@@ -173,6 +174,7 @@ class ServerSetupService {
                 createdInCategory.push({ channelDef, channel: created });
                 if (channelDef.special) specialChannels[channelDef.special] = created;
                 if (channelDef.special === 'interface') interfaceChannels.push(created);
+                if (channelDef.afk) afkChannel = created;
                 report.createdChannels += 1;
               } catch (err) {
                 report.errors.push(`Failed to create channel ${channelDef.name}: ${err.message}`);
@@ -185,6 +187,14 @@ class ServerSetupService {
           );
         })
       );
+
+      // 8b. Point the guild's AFK settings at the 〔💤〕 AFK voice channel
+      // created above, with a 15-minute timeout (900s — one of Discord's
+      // fixed AFK timeout values: 60/300/900/1800/3600).
+      if (afkChannel) {
+        await guild.setAFKChannel(afkChannel).catch((err) => report.errors.push(`Failed to set AFK channel: ${err.message}`));
+        await guild.setAFKTimeout(900).catch((err) => report.errors.push(`Failed to set AFK timeout: ${err.message}`));
+      }
 
       // 9-11. Panels — independent of each other, run concurrently.
       await Promise.all([
@@ -220,9 +230,10 @@ class ServerSetupService {
       const postVoiceGuides =
         interfaceChannels.length > 0
           ? (() => {
-              const guideEmbed = primaryEmbed(VOICE_GUIDE.title, VOICE_GUIDE.description)
-                .addFields(VOICE_GUIDE.commands.map((c) => ({ name: c.usage, value: `🇮🇩 ${c.id}\n🇬🇧 ${c.en}` })))
-                .setFooter({ text: VOICE_GUIDE.footer });
+              const guideEmbed = primaryEmbed(VOICE_GUIDE.title, null).addFields(
+                { name: '🇮🇩 Bahasa Indonesia', value: VOICE_GUIDE.id },
+                { name: '🇬🇧 English', value: VOICE_GUIDE.en }
+              );
               return Promise.all(
                 interfaceChannels.map((interfaceChannel) =>
                   interfaceChannel

@@ -5,17 +5,17 @@ import { configService } from './configService.js';
 const logger = createLogger('StatsService');
 
 /**
- * Each stat's display is `${emoji}・${label}: ${count}` — the part before
+ * Each stat's display is `〔${emoji}〕 ${label}: ${count}` — the part before
  * the count (the "prefix") is what we match existing channels against, so
  * updates work purely by scanning channel names in the live guild cache.
  * No setup-time state needed, so this works correctly even right after a
  * bot restart, long after /setup server originally created the channels.
  */
 const STAT_TYPES = [
-  { type: 'allMembers', emoji: '👤', label: 'All Members' },
-  { type: 'members', emoji: '✨', label: 'Members' },
-  { type: 'bots', emoji: '🤖', label: 'Bots' },
-  { type: 'channels', emoji: '📁', label: 'Channels' },
+  { type: 'allMembers', emoji: '👤', label: 'ALL MEMBERS' },
+  { type: 'members', emoji: '✨', label: 'MEMBERS' },
+  { type: 'bots', emoji: '🤖', label: 'BOTS' },
+  { type: 'channels', emoji: '📁', label: 'CHANNELS' },
 ];
 
 // Discord hard-limits channel name/topic edits to 2 per 10 minutes per
@@ -24,7 +24,7 @@ const STAT_TYPES = [
 // leave/channel change in real time.
 class StatsService {
   _prefix(def) {
-    return `${def.emoji}・${def.label}:`;
+    return `〔${def.emoji}〕 ${def.label}:`;
   }
 
   /** Computes current counts. Fetches the full member list once if the cache looks incomplete (needed for an accurate bot/human split). */

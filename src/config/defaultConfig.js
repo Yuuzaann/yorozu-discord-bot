@@ -12,7 +12,7 @@ export const defaultConfig = {
     enabled: true,
     deleteDelay: 0,
     nameFormat: "🔊・{username}'s Room",
-    triggerChannelNames: ['➕・Join to Create'],
+    triggerChannelNames: ['〔➕〕 JOIN TO CREATE'],
   },
   ticket: {
     enabled: true,
@@ -43,8 +43,8 @@ export const defaultConfig = {
   },
   logging: {
     enabled: true,
-    invoiceLogChannelName: 'invite-log',
-    actionLogChannelName: 'action-log',
+    invoiceLogChannelName: '〔🔗〕 INVITE LOG',
+    actionLogChannelName: '〔🔗〕 ACTION LOG',
   },
   welcome: {
     enabled: true,

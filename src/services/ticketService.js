@@ -93,7 +93,7 @@ class TicketService {
       return;
     }
 
-    const supportCategory = guild.channels.cache.find((c) => c.type === ChannelType.GuildCategory && c.name === '🎟️ Support');
+    const supportCategory = guild.channels.cache.find((c) => c.type === ChannelType.GuildCategory && c.name === '🎟️ ┊ SUPPORT');
     const staffRole = config.ticket.staffRoleId ? guild.roles.cache.get(config.ticket.staffRoleId) : null;
 
     const overwrites = [
