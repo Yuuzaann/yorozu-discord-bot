@@ -107,6 +107,27 @@ class ConfigService {
     }
   }
 
+  /** Economy account for one member of one guild, or null if they've never had one created. */
+  async getEconomyUser(guildId, userId) {
+    const store = await this._load();
+    return store.guilds[guildId]?.economy?.users?.[userId] ?? null;
+  }
+
+  /** Every economy account in a guild, keyed by user ID — used for the leaderboard. */
+  async getAllEconomyUsers(guildId) {
+    const store = await this._load();
+    return store.guilds[guildId]?.economy?.users ?? {};
+  }
+
+  async setEconomyUser(guildId, userId, data) {
+    const store = await this._load();
+    if (!store.guilds[guildId]) store.guilds[guildId] = {};
+    if (!store.guilds[guildId].economy) store.guilds[guildId].economy = { users: {} };
+    if (!store.guilds[guildId].economy.users) store.guilds[guildId].economy.users = {};
+    store.guilds[guildId].economy.users[userId] = data;
+    await this._save();
+  }
+
   /**
    * Bot presence/status is a single Gateway-wide setting shared across every
    * guild the bot is in (Discord bots only have one presence, not one per

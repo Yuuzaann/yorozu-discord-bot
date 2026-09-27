@@ -10,6 +10,11 @@ const SECTIONS = [
   { title: '🎭 Role', value: '`/roles setup`' },
   { title: '🎫 Ticket', value: '`/ticket setup` `/ticket close` `/ticket reopen` `/ticket claim` `/ticket delete` `/ticket transcript`' },
   { title: '🔊 Voice', value: '`/voice name` `/voice limit` `/voice lock` `/voice unlock` `/voice claim` `/voice kick` `/voice info`' },
+  {
+    title: '💰 Economy',
+    value:
+      '`/economy balance` `/economy daily` `/economy work` `/economy pay` `/economy deposit` `/economy withdraw` `/economy leaderboard` `/economy shop` `/economy buy`',
+  },
   { title: '🛠️ Config', value: '`/config view` `/config set` `/config staff-role`' },
   { title: '📊 Server Stats', value: '`/stats refresh`' },
   { title: '🤖 Bot Status', value: '`/status set` `/status clear` (bot owner only)' },

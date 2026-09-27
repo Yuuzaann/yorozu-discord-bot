@@ -1,0 +1,33 @@
+{
+  "guilds": {
+    "1550816482622046209": {
+      "config": {
+        "temporaryVoice": {
+          "deleteDelay": 0
+        }
+      },
+      "state": {
+        "selfRoleIds": {
+          "gamer": "1550817132957405194",
+          "artist": "1550817134869880893",
+          "developer": "1550817140313956424",
+          "music": "1550817141778022474",
+          "movie": "1550817143774253106",
+          "nightowl": "1550817145636790334"
+        }
+      },
+      "economy": {
+        "users": {
+          "1460258860282417208": {
+            "wallet": 600,
+            "bank": 0,
+            "lastDaily": 1790546526578,
+            "dailyStreak": 1,
+            "lastWork": 0,
+            "inventory": []
+          }
+        }
+      }
+    }
+  }
+}

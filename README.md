@@ -113,6 +113,9 @@ Every join and leave gets a generated banner image — avatar, member count, ser
 ### 📊 Live server stats
 A dedicated category shows real-time counts as join-locked voice channel names — 👤 All Members, ✨ Members, 🤖 Bots, 📁 Channels — visible to everyone, nobody able to actually connect to them. They're populated immediately after `/setup server`, refreshed automatically every **10 minutes** (matching Discord's hard limit of 2 name-edits per 10 minutes per channel — not an arbitrary number), and can be force-refreshed any time with `/stats refresh`.
 
+### 💰 A full virtual economy
+Wallet + bank, `/economy daily` (with a streak bonus for consecutive days) and `/economy work` (cooldown-gated random payout), `/economy pay` to send coins to another member, `/economy deposit`/`withdraw` to move coins between wallet and bank, a server `/economy leaderboard`, and a configurable `/economy shop` where items can optionally grant a role on purchase. All virtual — no real money, no payment processing, anywhere in this feature. Every currency amount, reward range, and shop item is configurable in `defaultConfig.js`, and admins get `/economy admin give/take/reset` for manual corrections.
+
 ### 🌍 Bilingual by default
 Every embed, every button, every error message the bot sends is written in **both Indonesian and English**, side by side. Not a locale switch you have to configure — it's simply how the bot talks, everywhere, all the time.
 
@@ -233,6 +236,14 @@ npm run dev
 | `/ticket delete` | Owner / Staff / Admin | Delete a ticket (confirmation required) |
 | `/ticket transcript` | Owner / Staff / Admin | Export the ticket's message history |
 | `/voice name/limit/lock/unlock/claim/kick/info` | Room owner (or anyone for `claim`/`info`) | Manage your temporary voice room |
+| `/economy balance [user]` | Anyone | Check your (or someone else's) wallet + bank balance |
+| `/economy daily` | Anyone | Claim your daily reward (streak bonus for consecutive days) |
+| `/economy work` | Anyone | Work for a random cooldown-gated payout |
+| `/economy pay <user> <amount>` | Anyone | Send coins to another member |
+| `/economy deposit/withdraw <amount>` | Anyone | Move coins between wallet and bank |
+| `/economy leaderboard` | Anyone | Show the richest members in the server |
+| `/economy shop` / `/economy buy <item>` | Anyone | View and purchase configurable shop items |
+| `/economy admin give/take/reset <user>` | Administrator | Manually adjust or reset a member's economy account |
 | `/config view` | Administrator | View the current guild configuration as JSON |
 | `/config set <key> <value>` | Administrator | Change any configuration value live |
 | `/config staff-role` | Administrator | Set which role counts as ticket staff |
@@ -296,6 +307,7 @@ src/
 │   ├── config.js          /config view/set/staff-role
 │   ├── status.js          /status set/clear
 │   ├── stats.js           /stats refresh
+│   ├── economy.js         /economy balance/daily/work/pay/deposit/withdraw/leaderboard/shop/buy/admin
 │   └── help.js            /help
 ├── events/                discord.js Gateway event handlers
 │   ├── ready.js           Applies stored bot status + first stats refresh on boot
@@ -311,6 +323,7 @@ src/
 │   ├── temporaryVoiceService.js  Room creation, ownership, auto-cleanup
 │   ├── welcomeService.js  Canvas-rendered welcome/goodbye cards
 │   ├── statsService.js    Computes & applies live Server Stats channel names
+│   ├── economyService.js  Balances, daily/work rewards, transfers, bank, leaderboard, shop
 │   ├── configService.js   Per-guild + global config persistence
 │   └── loggingService.js  Writes audit events to the guild's log channel
 ├── config/                Static, declarative configuration
@@ -344,6 +357,9 @@ No — the codebase uses ES Modules and `node:`-prefixed core imports throughout
 
 **Does it support servers other than the one I run `/setup server` in?**
 Yes — nothing in the runtime is guild-specific. See [Publishing to Many Servers](#-publishing-to-many-servers).
+
+**Is the economy feature real-money gambling?**
+No. `/economy` is entirely virtual currency, generated and spent inside Discord only — there's no payment processing, no real-money conversion, and no code path that touches anything outside `data/config.json`.
 
 **I changed `selfRoles.options` in `defaultConfig.js` — do I need to manually delete the old roles?**
 No. The next time `/roles setup` or `/setup server` runs, any self-role that's no longer in the list gets deleted automatically.

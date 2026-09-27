@@ -74,6 +74,28 @@ export const defaultConfig = {
     // rate limit), not configurable per guild — see statsService.js.
     enabled: true,
   },
+  economy: {
+    enabled: true,
+    currencyName: 'Koin',
+    currencySymbol: '🪙',
+    startingBalance: 100,
+    dailyAmount: 500,
+    // Extra coins per consecutive daily claim (capped at 30 days worth),
+    // e.g. streak day 5 pays dailyAmount + 4 * dailyStreakBonus.
+    dailyStreakBonus: 50,
+    workMinAmount: 100,
+    workMaxAmount: 400,
+    workCooldownMinutes: 60,
+    // Cosmetic items members can buy with /economy buy. `roleId: null` means
+    // a purely cosmetic entry (no functional effect, just bragging rights);
+    // set a real role ID to have a purchase grant that role automatically
+    // (still passes through the same dangerous-permission guard as every
+    // other role grant in the bot — see utils/permissions.js).
+    shop: [
+      { id: 'vip-badge', name: '⭐ VIP Badge', price: 5000, roleId: null },
+      { id: 'flex-badge', name: '💎 Flex Badge', price: 10000, roleId: null },
+    ],
+  },
 };
 
 /** Roles that must never be grantable through self-role, ticket or voice systems. */
