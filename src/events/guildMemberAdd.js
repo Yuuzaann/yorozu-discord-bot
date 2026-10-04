@@ -12,7 +12,7 @@ export async function execute(member) {
   try {
     const config = await configService.getGuildConfig(member.guild.id);
     await welcomeService.sendWelcome(member, config);
-    await loggingService.logAction(member.guild, 'Member Bergabung / Member Joined', `${member.user.tag} joined the server.`, {
+    await loggingService.logAction(member.guild, 'Member Bergabung / Member Joined', `${member.user?.tag ?? member.id} joined the server.`, {
       user: member.id,
       memberCount: member.guild.memberCount,
     });

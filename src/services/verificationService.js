@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto';
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 import { primaryEmbed, successEmbed, errorEmbed } from '../utils/embeds.js';
 import { bi, biTitle } from '../utils/i18n.js';
@@ -28,7 +29,7 @@ class VerificationService {
   }
 
   _generateOtp() {
-    return String(Math.floor(100000 + Math.random() * 900000)); // 6 digit
+    return String(randomInt(100000, 1000000)); // 6 digit, cryptographically secure
   }
 
   buildPanel() {
@@ -58,6 +59,13 @@ class VerificationService {
   /** Handles a verify button interaction: generates+DMs an OTP (reusing a still-valid one), then tells the member to run /otp. */
   async handleVerify(interaction, config) {
     const guild = interaction.guild;
+    if (config.verification.enabled === false) {
+      await interaction.reply({
+        embeds: [errorEmbed(biTitle('Dinonaktifkan', 'Disabled'), bi('Verifikasi dinonaktifkan untuk server ini.', 'Verification is disabled for this server.'))],
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
     let role = roleService.findByLabel(guild, config.verification.roleName);
     if (!role) {
       await guild.roles.fetch().catch(() => {});
@@ -87,39 +95,41 @@ class VerificationService {
     const existing = this.pendingOtps.get(interaction.user.id);
     const reuseExisting = existing && existing.guildId === guild.id && Date.now() < existing.expiresAt;
 
+    // A still-valid code is re-sent (not regenerated), so the member can recover a lost/deleted DM
+    // without resetting their remaining attempts or the 5-minute window.
+    const code = reuseExisting ? existing.code : this._generateOtp();
     if (!reuseExisting) {
-      const code = this._generateOtp();
       this.pendingOtps.set(interaction.user.id, { code, guildId: guild.id, expiresAt: Date.now() + OTP_TTL_MS, attempts: 0 });
+    }
 
-      try {
-        await interaction.user.send({
-          embeds: [
-            primaryEmbed(
-              biTitle('🔐 Kode Verifikasi', 'Verification Code'),
-              bi(
-                `Kode OTP kamu untuk **${guild.name}** adalah **${code}**. Berlaku 5 menit. Kembali ke server dan ketik \`/otp ${code}\` untuk menyelesaikan verifikasi.`,
-                `Your OTP code for **${guild.name}** is **${code}**. Valid for 5 minutes. Go back to the server and type \`/otp ${code}\` to finish verifying.`
-              )
-            ),
-          ],
-        });
-      } catch (err) {
-        this.pendingOtps.delete(interaction.user.id);
-        logger.warn(`Failed to DM OTP to ${interaction.user.tag}`, err.message);
-        await interaction.reply({
-          embeds: [
-            errorEmbed(
-              biTitle('DM gagal terkirim', 'DM failed to send'),
-              bi(
-                "Bot tidak bisa mengirim DM. Aktifkan 'Allow direct messages from server members' di Privacy Settings server ini, lalu klik Verify lagi.",
-                "The bot couldn't DM you. Enable 'Allow direct messages from server members' in this server's Privacy Settings, then click Verify again."
-              )
-            ),
-          ],
-          flags: MessageFlags.Ephemeral,
-        });
-        return;
-      }
+    try {
+      await interaction.user.send({
+        embeds: [
+          primaryEmbed(
+            biTitle('🔐 Kode Verifikasi', 'Verification Code'),
+            bi(
+              `Kode OTP kamu untuk **${guild.name}** adalah **${code}**. Berlaku 5 menit. Kembali ke server dan ketik \`/otp ${code}\` untuk menyelesaikan verifikasi.`,
+              `Your OTP code for **${guild.name}** is **${code}**. Valid for 5 minutes. Go back to the server and type \`/otp ${code}\` to finish verifying.`
+            )
+          ),
+        ],
+      });
+    } catch (err) {
+      if (!reuseExisting) this.pendingOtps.delete(interaction.user.id);
+      logger.warn(`Failed to DM OTP to ${interaction.user.tag}`, err.message);
+      await interaction.reply({
+        embeds: [
+          errorEmbed(
+            biTitle('DM gagal terkirim', 'DM failed to send'),
+            bi(
+              "Bot tidak bisa mengirim DM. Aktifkan 'Allow direct messages from server members' di Privacy Settings server ini, lalu klik Verify lagi.",
+              "The bot couldn't DM you. Enable 'Allow direct messages from server members' in this server's Privacy Settings, then click Verify again."
+            )
+          ),
+        ],
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
     }
 
     await interaction.reply({
@@ -200,8 +210,7 @@ class VerificationService {
       return;
     }
 
-    // Correct code.
-    this.pendingOtps.delete(interaction.user.id);
+    // Correct code (the OTP is only consumed once the role has actually been granted, below).
     let role = roleService.findByLabel(guild, config.verification.roleName);
     if (!role) {
       await guild.roles.fetch().catch(() => {});
@@ -222,6 +231,7 @@ class VerificationService {
 
     try {
       const result = await roleService.addVerifiedRole(interaction.member, role);
+      this.pendingOtps.delete(interaction.user.id);
       if (result.alreadyVerified) {
         await interaction.reply({
           embeds: [errorEmbed(biTitle('⚠️ Sudah terverifikasi', 'Already verified'), bi('Kamu sudah terverifikasi sebelumnya. Verifikasi hanya bisa dilakukan sekali.', "You're already verified. Verification can only be done once."))],

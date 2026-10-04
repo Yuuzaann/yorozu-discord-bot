@@ -1,15 +1,15 @@
 import { ChannelType, PermissionFlagsBits } from 'discord.js';
-import { applyTemplate, toChannelSafeName } from '../utils/normalize.js';
+import { applyTemplate } from '../utils/normalize.js';
 import { loggingService } from './loggingService.js';
+import { configService } from './configService.js';
 import { createLogger } from '../utils/logger.js';
 
 const logger = createLogger('TemporaryVoiceService');
 
 /**
- * In-memory registry of temp voice channels. Not persisted to disk on
- * purpose — on restart, orphaned temp channels are swept by
- * `sweepOrphans` since they carry no permanent-channel flag.
- * Map<channelId, { guildId, ownerId, categoryId, deleteTimer }>
+ * Registry of temp voice channels: Map<channelId, { guildId, ownerId, categoryId, deleteTimer }>.
+ * Kept in memory for speed, and mirrored (ids + owner only) into each guild's
+ * persisted state so `sweepOrphans` can clean up / re-adopt rooms after a restart.
  */
 class TemporaryVoiceService {
   constructor() {
@@ -32,17 +32,67 @@ class TemporaryVoiceService {
     return this.channels.get(channelId)?.ownerId ?? null;
   }
 
+  /** Writes this guild's slice of the registry to persisted state. */
+  async _persist(guildId) {
+    const map = {};
+    for (const [channelId, entry] of this.channels) {
+      if (entry.guildId === guildId) map[channelId] = { ownerId: entry.ownerId, categoryId: entry.categoryId };
+    }
+    await configService.updateGuildState(guildId, { tempVoiceChannels: map }).catch((err) => logger.warn('Failed to persist temp voice registry', err.message));
+  }
+
+  /**
+   * Run once on startup. Rooms recorded before the restart are either deleted
+   * (if empty — nobody is left to trigger the normal cleanup) or re-adopted
+   * (if people are still inside) so /voice commands and cleanup keep working.
+   */
+  async sweepOrphans(client) {
+    for (const guild of client.guilds.cache.values()) {
+      const state = await configService.getGuildState(guild.id);
+      const saved = state.tempVoiceChannels ?? {};
+      const ids = Object.keys(saved);
+      if (ids.length === 0) continue;
+
+      for (const channelId of ids) {
+        const channel = await guild.channels.fetch(channelId).catch(() => null);
+        if (!channel || channel.type !== ChannelType.GuildVoice) continue; // already gone
+
+        if (channel.members.size === 0) {
+          await channel.delete('Temporary voice cleanup: orphaned empty room after restart').catch((err) => logger.warn(`Failed to delete orphaned room ${channelId}`, err.message));
+          continue;
+        }
+        this.channels.set(channelId, {
+          guildId: guild.id,
+          ownerId: saved[channelId].ownerId ?? null,
+          categoryId: saved[channelId].categoryId ?? null,
+          deleteTimer: null,
+        });
+      }
+      await this._persist(guild.id);
+    }
+  }
+
   /** Creates a room for `member` in the same category as the trigger channel, and moves them in. */
   async createRoomFor(member, triggerChannel, config) {
-    const name = applyTemplate(config.temporaryVoice.nameFormat, { username: member.user.username });
-    const safeName = toChannelSafeName(name, `${member.user.username}'s Room`);
     const guild = member.guild;
+    const name =
+      applyTemplate(config.temporaryVoice.nameFormat, { username: member.user.username }).trim().slice(0, 100) ||
+      `🔊・${member.user.username}'s Room`.slice(0, 100);
+
+    // Start from the category's own permission overwrites (so a room is exactly as
+    // visible/joinable as the category it sits in — e.g. hidden from unverified
+    // members), then add the owner's management rights on top.
+    const source = triggerChannel.parent?.permissionOverwrites?.cache ?? triggerChannel.permissionOverwrites.cache;
+    const inherited = [...source.values()]
+      .filter((o) => o.id !== member.id)
+      .map((o) => ({ id: o.id, type: o.type, allow: o.allow, deny: o.deny }));
+
     const room = await guild.channels.create({
-      name: `🔊・${member.user.username}'s Room`.slice(0, 100),
+      name,
       type: ChannelType.GuildVoice,
-      parent: triggerChannel.parentId,
+      parent: triggerChannel.parentId ?? undefined,
       permissionOverwrites: [
-        { id: guild.roles.everyone.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect] },
+        ...inherited,
         {
           id: member.id,
           allow: [
@@ -55,8 +105,17 @@ class TemporaryVoiceService {
       ],
       reason: `Temporary voice room for ${member.user.tag}`,
     });
-    this.channels.set(room.id, { guildId: guild.id, ownerId: member.id, categoryId: triggerChannel.parentId });
-    await member.voice.setChannel(room).catch((err) => logger.warn('Failed to move member into new room', err.message));
+    this.channels.set(room.id, { guildId: guild.id, ownerId: member.id, categoryId: triggerChannel.parentId, deleteTimer: null });
+    await this._persist(guild.id);
+
+    try {
+      await member.voice.setChannel(room);
+    } catch (err) {
+      logger.warn('Failed to move member into new room', err.message);
+      // The member is not in the room (e.g. they left in the meantime) — nobody will ever
+      // trigger the "channel became empty" cleanup, so schedule it right away.
+      this.scheduleCleanup(room, config);
+    }
     await loggingService.logAction(guild, 'Voice Sementara Dibuat / Temp Voice Created', `Room created for ${member.user.tag}`, { channel: room.id });
     return room;
   }
@@ -68,10 +127,17 @@ class TemporaryVoiceService {
     if (entry.deleteTimer) clearTimeout(entry.deleteTimer);
     entry.deleteTimer = setTimeout(async () => {
       const fresh = await channel.guild.channels.fetch(channel.id).catch(() => null);
-      if (!fresh || fresh.members.size > 0) return;
+      if (!fresh) {
+        // Already deleted by someone else — just forget it.
+        this.channels.delete(channel.id);
+        await this._persist(channel.guild.id);
+        return;
+      }
+      if (fresh.members.size > 0) return;
       try {
         await fresh.delete('Temporary voice cleanup: empty channel');
         this.channels.delete(channel.id);
+        await this._persist(channel.guild.id);
         await loggingService.logAction(channel.guild, 'Voice Sementara Dihapus / Temp Voice Deleted', `Empty room removed`, { channel: channel.id });
       } catch (err) {
         logger.error('Failed to delete empty temp voice channel', err.message);
@@ -92,6 +158,7 @@ class TemporaryVoiceService {
     const entry = this.channels.get(channelId);
     if (!entry) return false;
     entry.ownerId = newOwnerId;
+    await this._persist(entry.guildId);
     return true;
   }
 }

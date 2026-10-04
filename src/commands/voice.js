@@ -54,6 +54,10 @@ export async function execute(interaction) {
       return;
     }
     await temporaryVoiceService.transferOwnership(channel.id, interaction.user.id);
+    // The previous owner must lose their management rights, otherwise they keep full control of a room they no longer own.
+    if (ownerId && ownerId !== interaction.user.id) {
+      await channel.permissionOverwrites.delete(ownerId, 'Room ownership transferred').catch(() => {});
+    }
     await channel.permissionOverwrites.edit(interaction.user.id, {
       ManageChannels: true,
       MoveMembers: true,
@@ -96,10 +100,11 @@ export async function execute(interaction) {
 
   if (sub === 'name') {
     const value = interaction.options.getString('value', true).slice(0, 95);
+    // Channel renames are rate-limited (2 per 10 min) and can stall well past 3 seconds — defer first.
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     await channel.setName(`🔊・${value}`);
-    await interaction.reply({
+    await interaction.editReply({
       embeds: [successEmbed(biTitle('Diganti nama', 'Renamed'), `Room diganti nama jadi / Room renamed to 🔊・${value}`)],
-      flags: MessageFlags.Ephemeral,
     });
     return;
   }

@@ -27,6 +27,17 @@ export async function execute(interaction, deps) {
   const { commands } = deps;
 
   try {
+    // Every command and component here is guild-scoped (roles, channels, tickets...). In a DM
+    // interaction.guild / interaction.member are null and the handlers would crash on them.
+    const isHandled = interaction.isChatInputCommand() || interaction.isButton() || interaction.isStringSelectMenu();
+    if (isHandled && !interaction.guild) {
+      await interaction.reply({
+        embeds: [errorEmbed(biTitle('Hanya di server', 'Server only'), bi('Command ini hanya bisa dipakai di dalam server.', 'This can only be used inside a server.'))],
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+
     if (interaction.isChatInputCommand()) {
       const command = commands.get(interaction.commandName);
       if (!command) return;
@@ -85,7 +96,15 @@ async function handleSelectMenu(interaction) {
   }
 
   if (id === ROLE_SELECT_ID) {
+    // Toggling several roles (plus a possible role refetch) can exceed the 3-second reply window.
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const config = await configService.getGuildConfig(interaction.guild.id);
+    if (config.selfRoles.enabled === false) {
+      await interaction.editReply({
+        embeds: [errorEmbed(biTitle('Dinonaktifkan', 'Disabled'), bi('Self-role dinonaktifkan untuk server ini.', 'Self-roles are disabled for this server.'))],
+      });
+      return;
+    }
     const selectedIds = interaction.values; // multi-select enabled — array of chosen option ids
 
     const added = [];
@@ -129,9 +148,8 @@ async function handleSelectMenu(interaction) {
 
     const hasIssue = notFound.length > 0 || failed.length > 0;
     const embedBuilder = hasIssue ? warningEmbed : successEmbed;
-    await interaction.reply({
+    await interaction.editReply({
       embeds: [embedBuilder(biTitle('Role diperbarui', 'Roles updated'), lines.join('\n') || bi('Tidak ada perubahan.', 'No changes made.'))],
-      flags: MessageFlags.Ephemeral,
     });
   }
 }

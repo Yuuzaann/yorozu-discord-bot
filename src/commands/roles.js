@@ -26,11 +26,12 @@ export async function execute(interaction) {
     });
     return;
   }
+  // Creating/pruning roles takes several API calls — defer so the reply can't miss the 3-second window.
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   const config = await configService.getGuildConfig(interaction.guild.id);
   await roleService.ensureCoreRoles(interaction.guild, config);
   await roleService.ensureTakeRolePanel(interaction.channel, config);
-  await interaction.reply({
+  await interaction.editReply({
     embeds: [successEmbed(biTitle('Panel dipasang', 'Panel posted'), bi('Panel take-role sudah siap.', 'Take-role panel is ready.'))],
-    flags: MessageFlags.Ephemeral,
   });
 }

@@ -9,12 +9,20 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.resolve(__dirname, '../../data');
 const CONFIG_PATH = path.join(DATA_DIR, 'config.json');
 
+// Keys that must never be merged from user-supplied patches (prototype pollution guard).
+const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+function isPlainObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
 function deepMerge(base, override) {
   if (typeof override !== 'object' || override === null) return base;
   const result = Array.isArray(base) ? [...base] : { ...base };
   for (const [key, value] of Object.entries(override)) {
-    if (value && typeof value === 'object' && !Array.isArray(value) && typeof base[key] === 'object') {
-      result[key] = deepMerge(base[key] ?? {}, value);
+    if (UNSAFE_KEYS.has(key)) continue;
+    if (isPlainObject(value)) {
+      result[key] = deepMerge(isPlainObject(base?.[key]) ? base[key] : {}, value);
     } else {
       result[key] = value;
     }
@@ -26,40 +34,64 @@ function deepMerge(base, override) {
  * File-backed per-guild config store. Kept intentionally simple (single
  * JSON file) — swap the read/write internals for a database if needed
  * without changing the public API.
+ *
+ * Writes are serialized through a promise chain and written atomically
+ * (temp file + rename), so two concurrent interactions can never interleave
+ * writes and leave a half-written / corrupt config.json behind.
  */
 class ConfigService {
   constructor() {
     this.cache = null;
+    this.loadPromise = null;
+    this.saveChain = Promise.resolve();
   }
 
   async _load() {
     if (this.cache) return this.cache;
+    if (!this.loadPromise) this.loadPromise = this._loadFromDisk();
+    return this.loadPromise;
+  }
+
+  async _loadFromDisk() {
     try {
       await fs.mkdir(DATA_DIR, { recursive: true });
       const raw = await fs.readFile(CONFIG_PATH, 'utf-8');
-      this.cache = JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      this.cache = isPlainObject(parsed) ? parsed : { guilds: {} };
+      if (!isPlainObject(this.cache.guilds)) this.cache.guilds = {};
     } catch (err) {
+      this.cache = { guilds: {} };
       if (err.code === 'ENOENT') {
-        this.cache = { guilds: {} };
         await this._save();
       } else {
-        logger.error('Failed to load config.json, starting with empty store.', err.message);
-        this.cache = { guilds: {} };
+        // Don't silently overwrite a corrupt file on the next save — keep a copy so data can be recovered by hand.
+        const backupPath = `${CONFIG_PATH}.corrupt-${Date.now()}`;
+        await fs.copyFile(CONFIG_PATH, backupPath).catch(() => {});
+        logger.error(`Failed to load config.json (backup saved to ${path.basename(backupPath)}), starting with empty store.`, err.message);
       }
     }
     return this.cache;
   }
 
-  async _save() {
-    await fs.mkdir(DATA_DIR, { recursive: true });
-    await fs.writeFile(CONFIG_PATH, JSON.stringify(this.cache, null, 2), 'utf-8');
+  _save() {
+    this.saveChain = this.saveChain
+      .then(async () => {
+        await fs.mkdir(DATA_DIR, { recursive: true });
+        const tmpPath = `${CONFIG_PATH}.tmp`;
+        await fs.writeFile(tmpPath, JSON.stringify(this.cache, null, 2), 'utf-8');
+        await fs.rename(tmpPath, CONFIG_PATH);
+      })
+      .catch((err) => {
+        logger.error('Failed to save config.json', err.message);
+      });
+    return this.saveChain;
   }
 
-  /** Returns the effective (default-merged) config for a guild. */
+  /** Returns the effective (default-merged) config for a guild. Always a deep copy — callers may mutate it freely. */
   async getGuildConfig(guildId) {
     const store = await this._load();
     const override = store.guilds[guildId]?.config ?? {};
-    return deepMerge(defaultConfig, override);
+    return structuredClone(deepMerge(defaultConfig, override));
   }
 
   /** Deep-merges `patch` into the guild's stored config overrides and persists it. */

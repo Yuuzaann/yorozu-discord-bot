@@ -102,17 +102,18 @@ export async function handleConfirm(interaction) {
   }
 
   serverSetupService.lock(guild.id);
-  await interaction.update({
-    embeds: [
-      primaryEmbed(
-        biTitle('⏳ Mereset server...', 'Resetting server...'),
-        bi('Proses ini bisa memakan waktu tergantung ukuran server.', 'This may take a while depending on server size.')
-      ),
-    ],
-    components: [],
-  });
 
   try {
+    await interaction.update({
+      embeds: [
+        primaryEmbed(
+          biTitle('⏳ Mereset server...', 'Resetting server...'),
+          bi('Proses ini bisa memakan waktu tergantung ukuran server.', 'This may take a while depending on server size.')
+        ),
+      ],
+      components: [],
+    });
+
     const config = await configService.getGuildConfig(guild.id);
     const report = await serverSetupService.runFullSetup(guild, config);
 

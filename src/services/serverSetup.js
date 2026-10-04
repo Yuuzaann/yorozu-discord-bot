@@ -197,13 +197,16 @@ class ServerSetupService {
       }
 
       // 9-11. Panels — independent of each other, run concurrently.
+      // Each panel is isolated: one failing to post (missing permission, etc.) is reported but
+      // must not abort the rest of the setup (rules, voice guides, stats).
+      const safe = (label, promise) => (promise ? promise.catch((err) => report.errors.push(`${label}: ${err.message}`)) : null);
       await Promise.all([
-        specialChannels.verification ? verificationService.ensurePanel(specialChannels.verification) : null,
+        safe('Failed to post verification panel', specialChannels.verification ? verificationService.ensurePanel(specialChannels.verification) : null),
         // 10. Take-role panel is posted by the roles command/service on demand via /roles setup,
         // but we also seed it here so setup is self-contained.
-        specialChannels['take-role'] ? roleService.ensureTakeRolePanel(specialChannels['take-role'], config) : null,
+        safe('Failed to post take-role panel', specialChannels['take-role'] ? roleService.ensureTakeRolePanel(specialChannels['take-role'], config) : null),
         // 11. Ticket panel
-        specialChannels['ticket-panel'] ? ticketService.ensurePanel(specialChannels['ticket-panel'], config) : null,
+        safe('Failed to post ticket panel', specialChannels['ticket-panel'] ? ticketService.ensurePanel(specialChannels['ticket-panel'], config) : null),
       ]);
 
       // 12. Logging is implicit: loggingService looks up channels by name at log time.
@@ -295,6 +298,15 @@ class ServerSetupService {
     }
 
     await category.permissionOverwrites.set(overwrites, 'Server setup: category permissions');
+
+    // The child channels were created *before* these category overwrites existed, and Discord
+    // does not push a category's overwrites down to children that already exist. Explicitly
+    // sync every child now, otherwise "hidden until verified" would only apply to the category itself.
+    await Promise.all(
+      createdInCategory.map(({ channel }) =>
+        channel.lockPermissions().catch((err) => logger.warn(`Failed to sync permissions for "${channel.name}"`, err.message))
+      )
+    );
 
     // Channels flagged channelReadonly: only Staff/Admin/Bot can post — regular
     // members (and Verified) can view and use buttons/select menus, but not

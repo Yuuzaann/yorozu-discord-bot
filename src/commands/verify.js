@@ -4,6 +4,7 @@ import { bi, biTitle } from '../utils/i18n.js';
 import { isAdmin } from '../utils/permissions.js';
 import { configService } from '../services/configService.js';
 import { verificationService } from '../services/verificationService.js';
+import { roleService } from '../services/roleService.js';
 
 export const data = new SlashCommandBuilder()
   .setName('verify')
@@ -55,7 +56,7 @@ export async function execute(interaction) {
   }
 
   if (sub === 'status') {
-    const role = interaction.guild.roles.cache.find((r) => r.name === config.verification.roleName);
+    const role = roleService.findByLabel(interaction.guild, config.verification.roleName);
     await interaction.reply({
       embeds: [
         infoEmbed(biTitle('Status verifikasi', 'Verification status'), null).addFields(

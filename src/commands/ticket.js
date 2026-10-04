@@ -1,4 +1,4 @@
-import { AttachmentBuilder, ChannelType, MessageFlags, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
+import { AttachmentBuilder, ChannelType, MessageFlags, SlashCommandBuilder } from 'discord.js';
 import { errorEmbed, successEmbed } from '../utils/embeds.js';
 import { bi, biTitle } from '../utils/i18n.js';
 import { isAdmin } from '../utils/permissions.js';

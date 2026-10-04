@@ -56,6 +56,11 @@ class RoleService {
     const trackedIds = state.selfRoleIds ?? {};
     const currentOptionIds = new Set(config.selfRoles.options.map((o) => o.id));
 
+    // Member lists are needed to tell an unused legacy role from one people still hold.
+    if (guild.members.cache.size < guild.memberCount) {
+      await guild.members.fetch().catch(() => {});
+    }
+
     const toDelete = new Map(); // roleId -> role
 
     for (const [optionId, roleId] of Object.entries(trackedIds)) {
@@ -67,7 +72,8 @@ class RoleService {
     for (const label of LEGACY_SELF_ROLE_LABELS) {
       if (currentLabels.has(normalizeName(label))) continue; // still configured, don't touch
       const role = this.findByLabel(guild, label);
-      if (role) toDelete.set(role.id, role);
+      // Name-based matching is a guess — never delete a managed (bot/integration) role or one members still hold.
+      if (role && !role.managed && role.members.size === 0) toDelete.set(role.id, role);
     }
 
     const deletions = [...toDelete.values()].map(async (role) => {
@@ -86,7 +92,7 @@ class RoleService {
   async ensureCoreRoles(guild, config) {
     const [verified, staff] = await Promise.all([
       this.ensureRole(guild, config.verification.roleName, { hoist: false }),
-      this.ensureRole(guild, 'Staff', { hoist: true, color: 0x5865f2 }),
+      this.ensureRole(guild, config.setup?.staffRoleName ?? 'Staff', { hoist: true, color: 0x5865f2 }),
     ]);
 
     await this.pruneObsoleteSelfRoles(guild, config);
@@ -153,7 +159,11 @@ class RoleService {
     const existing = messages?.find(
       (m) => m.author.id === channel.client.user.id && m.components?.[0]?.components?.[0]?.customId === ROLE_SELECT_ID
     );
-    if (existing) return existing;
+    if (existing) {
+      // Keep the menu in sync with the current self-role options.
+      await existing.edit(this.buildTakeRolePanel(config)).catch(() => {});
+      return existing;
+    }
     return channel.send(this.buildTakeRolePanel(config));
   }
 }

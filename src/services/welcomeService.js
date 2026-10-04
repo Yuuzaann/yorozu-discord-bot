@@ -1,4 +1,4 @@
-import { AttachmentBuilder } from 'discord.js';
+import { AttachmentBuilder, ChannelType } from 'discord.js';
 import { createCanvas, loadImage } from '@napi-rs/canvas';
 import { applyTemplate } from '../utils/normalize.js';
 import { createLogger } from '../utils/logger.js';
@@ -68,21 +68,30 @@ async function renderCard({ avatarUrl, headline, username, subtitle, accentColor
 
   ctx.fillStyle = '#c9c9e8';
   ctx.font = '24px sans-serif';
-  ctx.fillText(subtitle, textX, 215);
+  ctx.fillText(truncate(subtitle, 34), textX, 215);
 
   return canvas.encode('png');
 }
 
 function truncate(text, max) {
-  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+  const value = String(text ?? '');
+  return value.length > max ? `${value.slice(0, max - 1)}…` : value;
 }
 
 class WelcomeService {
+  /** Finds the first *text* channel whose name contains `name` (voice channels are "text-based" too, so type is checked explicitly). */
   _findChannel(guild, name) {
-    return guild.channels.cache.find((c) => c.name.toLowerCase().includes(name.toLowerCase())) ?? null;
+    const needle = name.toLowerCase();
+    return (
+      guild.channels.cache.find(
+        (c) => (c.type === ChannelType.GuildText || c.type === ChannelType.GuildAnnouncement) && c.name.toLowerCase().includes(needle)
+      ) ?? null
+    );
   }
 
   async sendWelcome(member, config) {
+    // A leaving member can be a partial with no cached user data, so fall back instead of crashing.
+    const username = member.user?.username ?? 'Unknown';
     if (!config.welcome.enabled) return;
     const guild = member.guild;
     const channel = this._findChannel(guild, config.welcome.channelName);
@@ -90,7 +99,7 @@ class WelcomeService {
 
     const text = applyTemplate(config.welcome.message, {
       user: `<@${member.id}>`,
-      username: member.user.username,
+      username,
       server: guild.name,
       membercount: guild.memberCount,
     });
@@ -99,9 +108,9 @@ class WelcomeService {
     if (config.welcome.useCard) {
       try {
         const buffer = await renderCard({
-          avatarUrl: member.user.displayAvatarURL({ extension: 'png', size: 256 }),
+          avatarUrl: member.user?.displayAvatarURL?.({ extension: 'png', size: 256 }),
           headline: 'WELCOME',
-          username: member.user.username,
+          username,
           subtitle: `Member #${guild.memberCount} • ${guild.name}`,
           accentColor: '#57f287',
         });
@@ -115,6 +124,8 @@ class WelcomeService {
   }
 
   async sendGoodbye(member, config) {
+    // A leaving member can be a partial with no cached user data, so fall back instead of crashing.
+    const username = member.user?.username ?? 'Unknown';
     if (!config.goodbye.enabled) return;
     const guild = member.guild;
     const channel = this._findChannel(guild, config.goodbye.channelName);
@@ -122,7 +133,7 @@ class WelcomeService {
 
     const text = applyTemplate(config.goodbye.message, {
       user: `<@${member.id}>`,
-      username: member.user.username,
+      username,
       server: guild.name,
       membercount: guild.memberCount,
     });
@@ -131,9 +142,9 @@ class WelcomeService {
     if (config.goodbye.useCard) {
       try {
         const buffer = await renderCard({
-          avatarUrl: member.user.displayAvatarURL({ extension: 'png', size: 256 }),
+          avatarUrl: member.user?.displayAvatarURL?.({ extension: 'png', size: 256 }),
           headline: 'GOODBYE',
-          username: member.user.username,
+          username,
           subtitle: `Now ${guild.memberCount} members • ${guild.name}`,
           accentColor: '#ed4245',
         });

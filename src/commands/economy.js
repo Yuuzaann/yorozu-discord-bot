@@ -244,9 +244,11 @@ export async function execute(interaction) {
   }
 
   if (sub === 'leaderboard') {
+    // Up to 10 user lookups below — defer so the reply can't miss Discord's 3-second window.
+    await interaction.deferReply();
     const top = await economyService.leaderboard(interaction.guild.id, 10);
     if (top.length === 0) {
-      await interaction.reply({ embeds: [infoEmbed(biTitle('🏆 Leaderboard', 'Leaderboard'), bi('Belum ada data.', 'No data yet.'))] });
+      await interaction.editReply({ embeds: [infoEmbed(biTitle('🏆 Leaderboard', 'Leaderboard'), bi('Belum ada data.', 'No data yet.'))] });
       return;
     }
     const lines = await Promise.all(
@@ -256,7 +258,7 @@ export async function execute(interaction) {
         return `**${i + 1}.** ${name} — ${formatAmount(entry.total, config)}`;
       })
     );
-    await interaction.reply({ embeds: [infoEmbed(biTitle('🏆 Leaderboard', 'Leaderboard'), lines.join('\n'))] });
+    await interaction.editReply({ embeds: [infoEmbed(biTitle('🏆 Leaderboard', 'Leaderboard'), lines.join('\n'))] });
     return;
   }
 
@@ -284,6 +286,7 @@ export async function execute(interaction) {
         already_owned: bi('Kamu sudah punya item ini.', 'You already own this item.'),
         role_missing: bi('Role untuk item ini sudah tidak ada. Hubungi admin.', "This item's role no longer exists. Contact an admin."),
         unsafe_role: bi('Item ini dikonfigurasi tidak aman dan diblokir. Hubungi admin.', 'This item is configured unsafely and was blocked. Contact an admin.'),
+        role_failed: bi('Role item ini gagal diberikan, jadi saldo kamu tidak dipotong. Hubungi admin (posisi role bot mungkin terlalu rendah).', "The item's role couldn't be granted, so you were not charged. Contact an admin (the bot's role may be too low)."),
       };
       await interaction.reply({
         embeds: [errorEmbed(biTitle('Gagal membeli', 'Purchase failed'), reasons[result.reason] ?? bi('Gagal membeli item.', 'Failed to purchase item.'))],

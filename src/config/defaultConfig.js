@@ -43,7 +43,7 @@ export const defaultConfig = {
   },
   logging: {
     enabled: true,
-    invoiceLogChannelName: '〔🔗〕INVITE LOG',
+    inviteLogChannelName: '〔🔗〕INVITE LOG',
     actionLogChannelName: '〔🔗〕ACTION LOG',
   },
   welcome: {
