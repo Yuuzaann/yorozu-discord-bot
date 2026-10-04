@@ -20,7 +20,4 @@ export async function execute(client) {
 
   statsService.updateAllGuilds(client).catch((err) => logger.error('Initial server stats update failed', err.stack ?? err.message));
 
-  if (process.env.AUTO_SETUP === 'true') {
-    logger.info('AUTO_SETUP=true — skipping destructive auto-setup on boot. Run /setup server manually per guild.');
-  }
 }

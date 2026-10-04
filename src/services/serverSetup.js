@@ -6,6 +6,7 @@ import { roleService } from './roleService.js';
 import { verificationService } from './verificationService.js';
 import { ticketService } from './ticketService.js';
 import { statsService } from './statsService.js';
+import { communityService } from './communityService.js';
 import { configService } from './configService.js';
 import { loggingService } from './loggingService.js';
 import { createLogger } from '../utils/logger.js';
@@ -50,6 +51,14 @@ const STAFF_ALLOW = [
   PermissionFlagsBits.ReadMessageHistory,
 ];
 
+// Bots hold no Verified role, so without their own overwrites they could not even see the channels.
+// Bot: read/post everywhere except the stats and staff-only categories.
+// Bot Musik: same, plus voice (Connect/Speak) so music bots can join the voice channels.
+const BOT_ALLOW_NAMES = ['ViewChannel', 'SendMessages', 'SendMessagesInThreads', 'EmbedLinks', 'AttachFiles', 'ReadMessageHistory', 'AddReactions', 'UseExternalEmojis'];
+const MUSIC_BOT_ALLOW_NAMES = [...BOT_ALLOW_NAMES, 'Connect', 'Speak', 'UseVAD'];
+const toBits = (names) => names.map((n) => PermissionFlagsBits[n]);
+const toNamedMap = (names) => Object.fromEntries(names.map((n) => [n, true]));
+
 /**
  * Guild-scoped lock so two /setup runs can never race on the same guild.
  */
@@ -77,7 +86,31 @@ class ServerSetupService {
         lines.push(`  ${channel.name}`);
       }
     }
+    lines.push('');
+    lines.push('**Roles**');
+    lines.push('  Staff, Verified, Member (display on), Bot (display on), Bot Musik (display on) + self-roles');
+    lines.push('**Community & Onboarding**');
+    lines.push('  Enable Community (rules + updates channel), Discord onboarding if eligible, welcome DM guide');
     return lines.join('\n');
+  }
+
+  /** Report lines shared by /setup and the automatic setup. */
+  formatReport(report) {
+    const icon = { enabled: '✅', already: '✅', skipped: '⏭️', failed: '⚠️' };
+    const lines = [
+      `Categories created / Kategori dibuat: ${report.createdCategories}`,
+      `Channels created / Channel dibuat: ${report.createdChannels}`,
+      `Roles ensured / Role dipastikan ada: ${report.createdRoles}`,
+    ];
+    if (report.autoRoles) {
+      lines.push(`Auto roles: ${report.autoRoles.bots} bot(s), ${report.autoRoles.members} member(s)`);
+    }
+    if (report.community) lines.push(`Community: ${icon[report.community.status] ?? '•'} ${report.community.detail ?? report.community.status}`);
+    if (report.onboarding) lines.push(`Discord Onboarding: ${icon[report.onboarding.status] ?? '•'} ${report.onboarding.detail ?? report.onboarding.status}`);
+    lines.push('Bot Onboarding: ✅ welcome DM + next steps after verification');
+    if (report.failedDeletions?.length > 0) lines.push(`Failed to delete / Gagal dihapus: ${report.failedDeletions.join(', ')}`);
+    if (report.errors?.length > 0) lines.push(`Errors / Error: ${report.errors.join(' | ')}`);
+    return lines;
   }
 
   async runFullSetup(guild, config) {
@@ -86,6 +119,9 @@ class ServerSetupService {
       createdCategories: 0,
       createdChannels: 0,
       createdRoles: 0,
+      community: null,
+      onboarding: null,
+      autoRoles: null,
       errors: [],
     };
 
@@ -95,6 +131,11 @@ class ServerSetupService {
       // server template, regardless of any prior override.
       await configService.updateGuildConfig(guild.id, { temporaryVoice: { deleteDelay: 0 } });
       config = await configService.getGuildConfig(guild.id);
+
+      // 0b. Community servers can't delete their rules/updates channels, so switch it off for the
+      // wipe; communityService.runAutomation() turns it back on at the end.
+      const reset = await communityService.prepareForReset(guild);
+      if (reset.error) report.errors.push(`Community: ${reset.error}`);
 
       // 1. Cleanup temporary voice (handled by the service's in-memory registry; nothing persistent to wipe here)
 
@@ -126,8 +167,8 @@ class ServerSetupService {
       );
 
       // 5. Create roles
-      const { verified, staff, selfRoles } = await roleService.ensureCoreRoles(guild, config);
-      report.createdRoles = 1 + 1 + Object.keys(selfRoles).length;
+      const { verified, staff, selfRoles, member, bot, musicBot } = await roleService.ensureCoreRoles(guild, config);
+      report.createdRoles = 2 + [member, bot, musicBot].filter(Boolean).length + Object.keys(selfRoles).length;
 
       // 6-8. Create categories, channels, permissions — parallelized as much
       // as the dependency chain allows: all categories at once, then every
@@ -182,7 +223,7 @@ class ServerSetupService {
             })
           );
 
-          await this._applyCategoryPermissions(guild, category, categoryDef, { verified, staff }, createdInCategory).catch((err) =>
+          await this._applyCategoryPermissions(guild, category, categoryDef, { verified, staff, bot, musicBot }, createdInCategory).catch((err) =>
             report.errors.push(`Permissions failed for ${categoryDef.name}: ${err.message}`)
           );
         })
@@ -195,6 +236,11 @@ class ServerSetupService {
         await guild.setAFKChannel(afkChannel).catch((err) => report.errors.push(`Failed to set AFK channel: ${err.message}`));
         await guild.setAFKTimeout(900).catch((err) => report.errors.push(`Failed to set AFK timeout: ${err.message}`));
       }
+
+      // Remember the special channels so onboarding / community can find them later without name matching.
+      await configService
+        .updateGuildState(guild.id, { channelIds: Object.fromEntries(Object.entries(specialChannels).map(([key, channel]) => [key, channel.id])) })
+        .catch((err) => report.errors.push(`Failed to save channel IDs: ${err.message}`));
 
       // 9-11. Panels — independent of each other, run concurrently.
       // Each panel is isolated: one failing to post (missing permission, etc.) is reported but
@@ -263,6 +309,17 @@ class ServerSetupService {
       // 10-minute scheduled update.
       await statsService.updateGuildStats(guild).catch((err) => report.errors.push(`Failed to populate server stats: ${err.message}`));
 
+      // 17. Give bots Bot / Bot Musik and verified members Member, so nobody already in the server is missed.
+      report.autoRoles = await roleService
+        .syncAutoRoles(guild, config)
+        .catch((err) => (report.errors.push(`Auto roles: ${err.message}`), null));
+
+      // 18. Community + Discord onboarding (last, because they need the finished channel layout).
+      const automation = await communityService.runAutomation(guild, config, { specialChannels, selfRoles });
+      report.community = automation.community;
+      report.onboarding = automation.onboarding;
+      if (automation.community.status === 'failed') report.errors.push(`Community: ${automation.community.detail}`);
+
       report.success = true;
     } catch (err) {
       logger.error('Setup failed', err.message);
@@ -273,7 +330,48 @@ class ServerSetupService {
     return report;
   }
 
-  async _applyCategoryPermissions(guild, category, categoryDef, { verified, staff }, createdInCategory) {
+  /**
+   * Non-destructive retrofit for servers that are already built: gives Bot / Bot Musik access to every
+   * category from the template (and its channels) by name. Stats and staff-only categories are skipped.
+   */
+  async applyBotRolePermissions(guild, { bot, musicBot }) {
+    const wanted = SERVER_STRUCTURE.filter((c) => !c.statsCategory && !c.staffOnly);
+    const edits = [];
+    for (const def of wanted) {
+      const target = def.name.toLowerCase();
+      const category = guild.channels.cache.find((c) => c.type === ChannelType.GuildCategory && c.name.toLowerCase() === target);
+      if (!category) continue;
+      const targets = [category, ...guild.channels.cache.filter((c) => c.parentId === category.id).values()];
+      for (const channel of targets) {
+        if (bot) edits.push(channel.permissionOverwrites.edit(bot, toNamedMap(BOT_ALLOW_NAMES), { reason: 'Yorozu: Bot role access' }).catch((err) => logger.warn(`Bot overwrite failed on "${channel.name}"`, err.message)));
+        if (musicBot) edits.push(channel.permissionOverwrites.edit(musicBot, toNamedMap(MUSIC_BOT_ALLOW_NAMES), { reason: 'Yorozu: Bot Musik role access' }).catch((err) => logger.warn(`Bot Musik overwrite failed on "${channel.name}"`, err.message)));
+      }
+    }
+    await Promise.all(edits);
+  }
+
+  /** Non-destructive: roles + bot access + Community + onboarding on an existing server. Deletes nothing. */
+  async runCommunitySetup(guild, config) {
+    const report = { createdCategories: 0, createdChannels: 0, createdRoles: 0, community: null, onboarding: null, autoRoles: null, failedDeletions: [], errors: [] };
+    try {
+      const { member, bot, musicBot, selfRoles } = await roleService.ensureCoreRoles(guild, config);
+      report.createdRoles = 2 + [member, bot, musicBot].filter(Boolean).length + Object.keys(selfRoles).length;
+      await this.applyBotRolePermissions(guild, { bot, musicBot });
+      report.autoRoles = await roleService.syncAutoRoles(guild, config);
+      const automation = await communityService.runAutomation(guild, config, { selfRoles });
+      report.community = automation.community;
+      report.onboarding = automation.onboarding;
+      if (automation.community.status === 'failed') report.errors.push(`Community: ${automation.community.detail}`);
+      report.success = true;
+    } catch (err) {
+      logger.error('Community setup failed', err.message);
+      report.success = false;
+      report.errors.push(err.message);
+    }
+    return report;
+  }
+
+  async _applyCategoryPermissions(guild, category, categoryDef, { verified, staff, bot, musicBot }, createdInCategory) {
     const everyone = guild.roles.everyone;
     const overwrites = [];
 
@@ -295,6 +393,11 @@ class ServerSetupService {
       overwrites.push({ id: everyone.id, deny: [PermissionFlagsBits.ViewChannel] });
       overwrites.push({ id: verified.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] });
       overwrites.push({ id: staff.id, allow: STAFF_ALLOW });
+    }
+
+    if (!categoryDef.statsCategory && !categoryDef.staffOnly) {
+      if (bot) overwrites.push({ id: bot.id, allow: toBits(BOT_ALLOW_NAMES) });
+      if (musicBot) overwrites.push({ id: musicBot.id, allow: toBits(MUSIC_BOT_ALLOW_NAMES) });
     }
 
     await category.permissionOverwrites.set(overwrites, 'Server setup: category permissions');

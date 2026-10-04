@@ -3,6 +3,7 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'disc
 import { primaryEmbed, successEmbed, errorEmbed } from '../utils/embeds.js';
 import { bi, biTitle } from '../utils/i18n.js';
 import { roleService } from './roleService.js';
+import { communityService } from './communityService.js';
 import { loggingService } from './loggingService.js';
 import { createLogger } from '../utils/logger.js';
 
@@ -239,8 +240,16 @@ class VerificationService {
         });
         return;
       }
+      // Member role is a bonus on top of Verified — a failure here must not undo the verification.
+      await roleService.grantMemberRole(interaction.member, config).catch((err) => logger.warn('Member role grant failed', err.message));
+      const nextSteps = await communityService.nextSteps(guild).catch(() => null);
       await interaction.reply({
-        embeds: [successEmbed(biTitle('Terverifikasi', 'Verified'), bi('✅ Verifikasi berhasil! Selamat datang.', '✅ Verification successful! Welcome.'))],
+        embeds: [
+          successEmbed(
+            biTitle('Terverifikasi', 'Verified'),
+            [bi('✅ Verifikasi berhasil! Selamat datang.', '✅ Verification successful! Welcome.'), nextSteps].filter(Boolean).join('\n\n')
+          ),
+        ],
         flags: MessageFlags.Ephemeral,
       });
       await loggingService.logAction(guild, 'Verifikasi / Verification', `${interaction.user.tag} verified via OTP.`, { user: interaction.user.id });

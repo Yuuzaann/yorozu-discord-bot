@@ -60,6 +60,13 @@ Run `/setup preview` any time to see exactly what the bot *would* build — no c
 
 Every independent step in that list runs **concurrently** rather than one API call at a time — the whole reset finishes in a handful of batches instead of one round-trip per item.
 
+### 🏘️ Automatic community setup & onboarding
+- **Part of `/setup server`:** nothing happens automatically when the bot joins — you stay in control. When you run `/setup server`, it also sets up Community and onboarding as the last steps.
+- **Community:** enables Discord's Community mode (rules channel = `RULES`, updates channel = `ACTION LOG`) and raises verification level / media filter to the minimum Discord requires. Needs the **Manage Server** permission.
+- **Onboarding:** every new member gets a bilingual welcome DM with the steps (rules → verify → pick roles → say hi), and a "next steps" hint after `/otp`. Discord's built-in Onboarding (interest + language prompts that hand out the self-roles) is configured too whenever Discord allows it — it requires ≥7 channels visible to `@everyone` (≥5 writable), which the verification-gated layout doesn't have, so it is skipped with a clear note instead of failing.
+- **Roles (all shown separately in the member list):** `Member` (granted after verification), `Bot` (every bot that joins) and `Bot Musik` (music bots, detected by ID or name; fix with `/roles musicbot`). Bot / Bot Musik also get channel access, since bots hold no `Verified` role. Bot Musik can additionally connect and speak in voice channels.
+- Already have a built server? Run `/setup community` — it adds all of the above **without deleting a single channel**.
+
 ### 🔐 OTP-based verification
 No confusing "react with ✅" buttons that a raid bot can script in an instant. Yorozu uses a real one-time-password flow:
 
@@ -212,7 +219,7 @@ npm start
 npm run dev
 ```
 
-**Inviting the bot:** the simplest invite scope is `Administrator`, given how much of the server this bot manages directly. If you'd rather scope it down, the minimum set is `Manage Channels`, `Manage Roles`, `Manage Messages`, `Move Members`, `Connect`, `View Channel`, `Send Messages`, `Embed Links`.
+**Inviting the bot:** the simplest invite scope is `Administrator`, given how much of the server this bot manages directly. If you'd rather scope it down, the minimum set is `Manage Channels`, `Manage Roles`, `Manage Server` (for Community & onboarding), `Manage Messages`, `Move Members`, `Connect`, `View Channel`, `Send Messages`, `Embed Links`.
 
 **First run in a server:** an admin should run `/setup preview` first to see what will be built, then `/setup server` to actually build it. The bot also posts a short bilingual pointer to these two commands automatically the moment it joins a new server.
 
@@ -224,11 +231,14 @@ npm run dev
 |---|---|---|
 | `/setup preview` | Administrator | Preview the server structure — makes no changes |
 | `/setup server` | Administrator | Reset and rebuild the entire server (confirmation required) |
+| `/setup community` | Administrator | Enable Community, onboarding and Member/Bot/Bot Musik roles — deletes nothing |
 | `/verify setup` | Administrator | Enable/reconfigure the verification system |
 | `/verify panel` | Administrator | (Re)post the verification panel in the current channel |
 | `/verify status` | Administrator | Show verification configuration status |
 | `/otp <code>` | Anyone | Submit your OTP code to complete verification |
 | `/roles setup` | Administrator | (Re)post the take-role panel in the current channel |
+| `/roles sync` | Administrator | Give Member / Bot / Bot Musik to everyone already in the server |
+| `/roles musicbot <bot> [enabled]` | Administrator | Mark a bot as music bot (Bot Musik) or normal bot (Bot) |
 | `/ticket setup` | Administrator | (Re)post the ticket panel in the current channel |
 | `/ticket close` | Owner / Staff / Admin | Close the current ticket |
 | `/ticket reopen` | Owner / Staff / Admin | Reopen a closed ticket |

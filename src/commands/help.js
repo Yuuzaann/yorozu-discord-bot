@@ -5,9 +5,9 @@ import { biTitle } from '../utils/i18n.js';
 export const data = new SlashCommandBuilder().setName('help').setDescription('Show available commands');
 
 const SECTIONS = [
-  { title: '⚙️ Setup', value: '`/setup preview` `/setup server`' },
+  { title: '⚙️ Setup', value: '`/setup preview` `/setup server` `/setup community`' },
   { title: '✅ Verifikasi / Verification', value: '`/verify setup` `/verify panel` `/verify status` `/otp <code>`' },
-  { title: '🎭 Role', value: '`/roles setup`' },
+  { title: '🎭 Role', value: '`/roles setup` `/roles sync` `/roles musicbot`' },
   { title: '🎫 Ticket', value: '`/ticket setup` `/ticket close` `/ticket reopen` `/ticket claim` `/ticket delete` `/ticket transcript`' },
   { title: '🔊 Voice', value: '`/voice name` `/voice limit` `/voice lock` `/voice unlock` `/voice claim` `/voice kick` `/voice info`' },
   {

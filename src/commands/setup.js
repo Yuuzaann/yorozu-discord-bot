@@ -17,7 +17,10 @@ export const data = new SlashCommandBuilder()
   .setDescription('Server setup and reset')
   .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
   .addSubcommand((sub) => sub.setName('preview').setDescription('Preview the structure setup would create (no changes made)'))
-  .addSubcommand((sub) => sub.setName('server').setDescription('Reset and rebuild the entire server structure'));
+  .addSubcommand((sub) => sub.setName('server').setDescription('Reset and rebuild the entire server structure'))
+  .addSubcommand((sub) =>
+    sub.setName('community').setDescription('Enable Community, onboarding and Member/Bot/Bot Musik roles — deletes nothing')
+  );
 
 export async function execute(interaction) {
   if (!isAdmin(interaction.member)) {
@@ -40,6 +43,39 @@ export async function execute(interaction) {
       ],
       flags: MessageFlags.Ephemeral,
     });
+    return;
+  }
+
+  if (sub === 'community') {
+    if (!botHasSetupPermissions(interaction.guild)) {
+      await interaction.reply({
+        embeds: [errorEmbed(biTitle('Izin kurang', 'Missing permissions'), bi('Bot memerlukan izin Manage Channels dan Manage Roles (plus Manage Server untuk Community).', 'Bot requires Manage Channels and Manage Roles (plus Manage Server for Community).'))],
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+    if (serverSetupService.isLocked(interaction.guild.id)) {
+      await interaction.reply({
+        embeds: [warningEmbed(biTitle('Setup sedang berjalan', 'Setup in progress'), bi('Setup sudah berjalan untuk server ini.', 'A setup is already running for this server.'))],
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    const guild = interaction.guild;
+    serverSetupService.lock(guild.id);
+    try {
+      const config = await configService.getGuildConfig(guild.id);
+      const report = await serverSetupService.runCommunitySetup(guild, config);
+      const lines = serverSetupService.formatReport(report);
+      const embed = report.success && report.errors.length === 0
+        ? successEmbed(biTitle('✅ Community & Onboarding siap', 'Community & Onboarding ready'), lines.join('\n'))
+        : warningEmbed(biTitle('⚠️ Selesai dengan masalah', 'Completed with issues'), lines.join('\n'));
+      await interaction.editReply({ embeds: [embed] });
+      await loggingService.logAction(guild, 'Community Setup', lines.join('\n'));
+    } finally {
+      serverSetupService.unlock(guild.id);
+    }
     return;
   }
 
@@ -117,17 +153,7 @@ export async function handleConfirm(interaction) {
     const config = await configService.getGuildConfig(guild.id);
     const report = await serverSetupService.runFullSetup(guild, config);
 
-    const summaryLines = [
-      `Categories created / Kategori dibuat: ${report.createdCategories}`,
-      `Channels created / Channel dibuat: ${report.createdChannels}`,
-      `Roles ensured / Role dipastikan ada: ${report.createdRoles}`,
-    ];
-    if (report.failedDeletions.length > 0) {
-      summaryLines.push(`Failed to delete / Gagal dihapus: ${report.failedDeletions.join(', ')}`);
-    }
-    if (report.errors.length > 0) {
-      summaryLines.push(`Errors / Error: ${report.errors.join(' | ')}`);
-    }
+    const summaryLines = serverSetupService.formatReport(report);
 
     const embed = report.success && report.errors.length === 0
       ? successEmbed(biTitle('✅ Setup Selesai', 'Setup Complete'), summaryLines.join('\n'))

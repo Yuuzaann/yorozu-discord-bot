@@ -109,7 +109,7 @@ export const SERVER_STRUCTURE = [
     staffOnly: true,
     channels: [
       { name: '〔🔗〕INVITE LOG', type: ChannelType.GuildText },
-      { name: '〔🔗〕ACTION LOG', type: ChannelType.GuildText },
+      { name: '〔🔗〕ACTION LOG', type: ChannelType.GuildText, special: 'community-updates' },
     ],
   },
   {

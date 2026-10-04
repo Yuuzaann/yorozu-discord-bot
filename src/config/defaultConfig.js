@@ -63,6 +63,40 @@ export const defaultConfig = {
   setup: {
     staffRoleName: 'Staff',
   },
+  roles: {
+    // Shown as separate groups in the member list ("display role members separately" = hoist).
+    // Humans get `member` after verification (or on join when verification is off).
+    member: { enabled: true, name: 'Member', hoist: true, color: 0x57f287 },
+    // Every bot that joins gets `bot`, except music bots which get `musicBot` instead.
+    bot: { enabled: true, name: 'Bot', hoist: true, color: 0x99aab5 },
+    musicBot: {
+      enabled: true,
+      name: 'Bot Musik',
+      hoist: true,
+      color: 0xeb459e,
+      // A bot is treated as a music bot if its ID is in botIds, or its name contains one of
+      // nameHints (case/space-insensitive) — unless its ID is in excludeIds.
+      // Fix wrong guesses with /roles musicbot <bot> <enabled>.
+      botIds: [],
+      excludeIds: [],
+      nameHints: ['music', 'musik', 'jockie', 'hydra', 'rythm', 'groovy', 'fredboat', 'vexera', 'lavalink', 'soundcloud', 'spotify', 'lavamusic'],
+    },
+  },
+  community: {
+    // Turns on Discord's Community features (needs the Manage Server permission): rules channel =
+    // RULES, community-updates channel = ACTION LOG. Also raises verification level to at least
+    // "Low" and the media filter to "all members", which Discord requires for Community.
+    enabled: true,
+  },
+  onboarding: {
+    enabled: true,
+    // Bot-driven onboarding: welcome DM with step-by-step guide + "next steps" after OTP verification.
+    dm: true,
+    // Also try Discord's built-in Onboarding (prompts that hand out the self-roles). Discord only
+    // allows this when >= 7 text channels are visible to @everyone (>= 5 of them writable), which
+    // the default verification-gated layout does not satisfy — it is then skipped automatically.
+    native: true,
+  },
   rules: {
     // If null, the bilingual DEFAULT_RULES from src/config/rulesContent.js is posted.
     // Override with /config set rules.content "your own text" for a custom set of rules.
