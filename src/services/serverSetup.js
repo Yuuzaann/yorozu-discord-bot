@@ -1,7 +1,7 @@
 import { ChannelType, PermissionFlagsBits } from 'discord.js';
 import { SERVER_STRUCTURE } from '../config/serverStructure.js';
 import { DEFAULT_RULES } from '../config/rulesContent.js';
-import { VOICE_GUIDE } from '../config/voiceGuideContent.js';
+import { voiceInterfaceService } from './voiceInterfaceService.js';
 import { roleService } from './roleService.js';
 import { verificationService } from './verificationService.js';
 import { ticketService } from './ticketService.js';
@@ -274,23 +274,17 @@ class ServerSetupService {
           })()
         : null;
 
-      // 15. Post the full bilingual /voice command guide to every "interface"
-      // channel (Game Zone and Voice Public both have one) — sent concurrently.
+      // 15. Post the TempVoice interface (embed + button grid) in every "interface" channel
+      // (Game Zone and Voice Public both have one) — sent concurrently.
       const postVoiceGuides =
         interfaceChannels.length > 0
-          ? (() => {
-              const guideEmbed = primaryEmbed(VOICE_GUIDE.title, null).addFields(
-                { name: '🇮🇩 Bahasa Indonesia', value: VOICE_GUIDE.id },
-                { name: '🇬🇧 English', value: VOICE_GUIDE.en }
-              );
-              return Promise.all(
-                interfaceChannels.map((interfaceChannel) =>
-                  interfaceChannel
-                    .send({ embeds: [guideEmbed] })
-                    .catch((err) => report.errors.push(`Failed to post voice guide in ${interfaceChannel.name}: ${err.message}`))
-                )
-              );
-            })()
+          ? Promise.all(
+              interfaceChannels.map((interfaceChannel) =>
+                voiceInterfaceService
+                  .ensurePanel(interfaceChannel)
+                  .catch((err) => report.errors.push(`Failed to post voice interface in ${interfaceChannel.name}: ${err.message}`))
+              )
+            )
           : null;
 
       // Ensure the Verified role has full read/write on general (belt-and-braces;

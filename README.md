@@ -55,7 +55,7 @@ Run `/setup preview` any time to see exactly what the bot *would* build — no c
 1. Wipes every existing category and channel (nothing survives a reset — that's the point)
 2. Rebuilds the entire structure: 9 categories, ~30 channels, with permissions applied at the same time
 3. Creates every role it needs (`Verified`, `Staff`, and your configured self-roles) — reusing any that already exist by name instead of duplicating them
-4. Posts the verification panel, take-role panel, ticket panel, a bilingual rules embed, and a `/voice` command guide — automatically, every run
+4. Posts the verification panel, take-role panel, ticket panel, a bilingual rules embed, and the TempVoice interface (button panel) — automatically, every run
 5. Delivers a full report of what succeeded and what didn't, even if the channel you ran the command in got deleted mid-reset (it falls back to a DM)
 
 Every independent step in that list runs **concurrently** rather than one API call at a time — the whole reset finishes in a handful of batches instead of one round-trip per item.
@@ -108,6 +108,8 @@ Join **➕・Join to Create** and a personal voice room appears in the same cate
 | `/voice claim` | Take over if the owner left |
 | `/voice kick` | Remove someone from your room |
 | `/voice info` | See owner, member count, limit |
+
+Prefer buttons? The **✨ interface** channel carries a TempVoice-style panel — a 3×5 grid of icon buttons: Name, Limit, Privacy (public / locked / hidden), Waiting Room, Chat, Trust, Untrust, Invite, Kick, Region, Block, Unblock, Claim, Transfer, Delete. They act on the temp room you are currently in, and (except Claim) only for its owner. Trust/Block lists are per room. Already-built server? `/voice panel` (Administrator) posts the panel in the current channel.
 
 The room deletes itself the instant it's empty. No admin ever has to go clean up a graveyard of abandoned voice channels.
 
@@ -166,13 +168,13 @@ Every embed, every button, every error message the bot sends is written in **bot
 └── ➕ Join to Create           ← temp voice trigger
 
 🎮 Game Zone
-├── ✨ interface                ← read-only, /voice command guide auto-posted
+├── ✨ interface                ← read-only, TempVoice button panel auto-posted
 ├── 💬 game-chat
 ├── 🎮 game-room
 └── ➕ Join to Create
 
 🔊 Voice Public
-├── ✨ interface                ← read-only, /voice command guide auto-posted
+├── ✨ interface                ← read-only, TempVoice button panel auto-posted
 ├── 💬 voice-chat
 ├── 📢 voice-info
 └── ➕ Join to Create
@@ -339,8 +341,7 @@ src/
 ├── config/                Static, declarative configuration
 │   ├── serverStructure.js   The entire category/channel tree + permission flags
 │   ├── defaultConfig.js   Every configurable key and its default
-│   ├── rulesContent.js    Default bilingual rules text
-│   └── voiceGuideContent.js  Default bilingual /voice command guide
+│   └── rulesContent.js    Default bilingual rules text
 ├── utils/                 Small, focused helpers
 │   ├── logger.js          Console logging
 │   ├── embeds.js          Embed builder shortcuts

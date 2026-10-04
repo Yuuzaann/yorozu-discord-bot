@@ -36,7 +36,7 @@ class TemporaryVoiceService {
   async _persist(guildId) {
     const map = {};
     for (const [channelId, entry] of this.channels) {
-      if (entry.guildId === guildId) map[channelId] = { ownerId: entry.ownerId, categoryId: entry.categoryId };
+      if (entry.guildId === guildId) map[channelId] = { ownerId: entry.ownerId, categoryId: entry.categoryId, waitingId: entry.waitingId ?? null };
     }
     await configService.updateGuildState(guildId, { tempVoiceChannels: map }).catch((err) => logger.warn('Failed to persist temp voice registry', err.message));
   }
@@ -55,9 +55,14 @@ class TemporaryVoiceService {
 
       for (const channelId of ids) {
         const channel = await guild.channels.fetch(channelId).catch(() => null);
-        if (!channel || channel.type !== ChannelType.GuildVoice) continue; // already gone
+        if (!channel || channel.type !== ChannelType.GuildVoice) {
+          // Room already gone — make sure its waiting room doesn't linger.
+          if (saved[channelId].waitingId) await guild.channels.delete(saved[channelId].waitingId, 'Temporary voice cleanup: orphaned waiting room').catch(() => {});
+          continue;
+        }
 
         if (channel.members.size === 0) {
+          if (saved[channelId].waitingId) await guild.channels.delete(saved[channelId].waitingId, 'Temporary voice cleanup: orphaned waiting room').catch(() => {});
           await channel.delete('Temporary voice cleanup: orphaned empty room after restart').catch((err) => logger.warn(`Failed to delete orphaned room ${channelId}`, err.message));
           continue;
         }
@@ -65,6 +70,7 @@ class TemporaryVoiceService {
           guildId: guild.id,
           ownerId: saved[channelId].ownerId ?? null,
           categoryId: saved[channelId].categoryId ?? null,
+          waitingId: saved[channelId].waitingId ?? null,
           deleteTimer: null,
         });
       }
@@ -135,6 +141,7 @@ class TemporaryVoiceService {
       }
       if (fresh.members.size > 0) return;
       try {
+        if (entry.waitingId) await channel.guild.channels.delete(entry.waitingId, 'Temporary voice cleanup: room removed').catch(() => {});
         await fresh.delete('Temporary voice cleanup: empty channel');
         this.channels.delete(channel.id);
         await this._persist(channel.guild.id);
@@ -152,6 +159,29 @@ class TemporaryVoiceService {
       clearTimeout(entry.deleteTimer);
       entry.deleteTimer = null;
     }
+  }
+
+  getWaiting(channelId) {
+    return this.channels.get(channelId)?.waitingId ?? null;
+  }
+
+  async setWaiting(channelId, waitingId) {
+    const entry = this.channels.get(channelId);
+    if (!entry) return false;
+    entry.waitingId = waitingId;
+    await this._persist(entry.guildId);
+    return true;
+  }
+
+  /** Deletes a room together with its waiting room and forgets it (used by the interface's Delete button). */
+  async removeRoom(channel, reason) {
+    const entry = this.channels.get(channel.id);
+    if (entry?.deleteTimer) clearTimeout(entry.deleteTimer);
+    if (entry?.waitingId) await channel.guild.channels.delete(entry.waitingId, reason).catch(() => {});
+    this.channels.delete(channel.id);
+    await this._persist(channel.guild.id);
+    await channel.delete(reason);
+    await loggingService.logAction(channel.guild, 'Voice Sementara Dihapus / Temp Voice Deleted', 'Room deleted by its owner', { channel: channel.id });
   }
 
   async transferOwnership(channelId, newOwnerId) {

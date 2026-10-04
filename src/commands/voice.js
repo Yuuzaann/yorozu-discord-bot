@@ -2,6 +2,8 @@ import { MessageFlags, PermissionFlagsBits, SlashCommandBuilder } from 'discord.
 import { errorEmbed, infoEmbed, successEmbed } from '../utils/embeds.js';
 import { bi, biTitle } from '../utils/i18n.js';
 import { temporaryVoiceService } from '../services/temporaryVoiceService.js';
+import { voiceInterfaceService } from '../services/voiceInterfaceService.js';
+import { isAdmin } from '../utils/permissions.js';
 
 export const data = new SlashCommandBuilder()
   .setName('voice')
@@ -18,7 +20,8 @@ export const data = new SlashCommandBuilder()
   .addSubcommand((sub) =>
     sub.setName('kick').setDescription('Kick a member from your room').addUserOption((o) => o.setName('user').setDescription('Member to kick').setRequired(true))
   )
-  .addSubcommand((sub) => sub.setName('info').setDescription('Show room info'));
+  .addSubcommand((sub) => sub.setName('info').setDescription('Show room info'))
+  .addSubcommand((sub) => sub.setName('panel').setDescription('(Admin) Post the TempVoice interface panel in this channel'));
 
 function getMemberVoiceChannel(interaction) {
   return interaction.member.voice?.channel ?? null;
@@ -27,6 +30,20 @@ function getMemberVoiceChannel(interaction) {
 export async function execute(interaction) {
   const sub = interaction.options.getSubcommand();
   const channel = getMemberVoiceChannel(interaction);
+
+  if (sub === 'panel') {
+    if (!isAdmin(interaction.member)) {
+      await interaction.reply({
+        embeds: [errorEmbed(biTitle('Khusus admin', 'Admin only'), bi('Hanya Administrator yang bisa memasang panel.', 'Only Administrators can post the panel.'))],
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    await voiceInterfaceService.ensurePanel(interaction.channel);
+    await interaction.editReply({ embeds: [successEmbed(biTitle('Panel dipasang', 'Panel posted'), bi('Panel TempVoice dipasang di channel ini.', 'TempVoice panel posted in this channel.'))] });
+    return;
+  }
 
   if (!channel || !temporaryVoiceService.isManaged(channel.id)) {
     await interaction.reply({

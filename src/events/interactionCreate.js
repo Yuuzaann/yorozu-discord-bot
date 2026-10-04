@@ -15,6 +15,7 @@ import {
   TICKET_DELETE_CANCEL_ID,
 } from '../services/ticketService.js';
 import { SETUP_CONFIRM_ID, SETUP_CANCEL_ID, handleConfirm as handleSetupConfirm, handleCancel as handleSetupCancel } from '../commands/setup.js';
+import { voiceInterfaceService, VOICE_INTERFACE_PREFIX } from '../services/voiceInterfaceService.js';
 import { successEmbed, warningEmbed } from '../utils/embeds.js';
 import { bi, biTitle } from '../utils/i18n.js';
 
@@ -29,12 +30,23 @@ export async function execute(interaction, deps) {
   try {
     // Every command and component here is guild-scoped (roles, channels, tickets...). In a DM
     // interaction.guild / interaction.member are null and the handlers would crash on them.
-    const isHandled = interaction.isChatInputCommand() || interaction.isButton() || interaction.isStringSelectMenu();
+    const isHandled =
+      interaction.isChatInputCommand() ||
+      interaction.isButton() ||
+      interaction.isStringSelectMenu() ||
+      interaction.isUserSelectMenu() ||
+      interaction.isModalSubmit();
     if (isHandled && !interaction.guild) {
       await interaction.reply({
         embeds: [errorEmbed(biTitle('Hanya di server', 'Server only'), bi('Command ini hanya bisa dipakai di dalam server.', 'This can only be used inside a server.'))],
         flags: MessageFlags.Ephemeral,
       });
+      return;
+    }
+
+    // TempVoice interface: buttons, modals and select menus all share the "tv:" prefix.
+    if (interaction.customId?.startsWith(VOICE_INTERFACE_PREFIX)) {
+      await voiceInterfaceService.handle(interaction);
       return;
     }
 
